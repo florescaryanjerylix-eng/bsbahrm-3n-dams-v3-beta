@@ -2,61 +2,73 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>DAMS V3.3.0 — Digital Attendance Monitoring System</title>
-<!-- [KEEP ALL YOUR ORIGINAL CSS STYLES HERE] -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAMS v3.1.5 Beta</title>
 <style>
-/* ... (Paste your original CSS from the source you provided earlier here) ... */
+  body { font-family: 'Segoe UI', sans-serif; background: #faf7f2; padding: 20px; color: #241014; }
+  .logo { width: 60px; height: 60px; background: #7A0C2E; color: #F4B41A; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: bold; font-size: 20px; margin-bottom: 20px; }
+  select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ddd; }
+  button { background: #7A0C2E; color: white; border: none; font-weight: bold; }
 </style>
 </head>
 <body>
 
-<!-- [KEEP ALL YOUR ORIGINAL HTML STRUCTURE HERE - FROM THE FILE YOU PROVIDED] -->
-<!-- (Make sure to include your header, nav, and all views) -->
+<div class="logo">Dv3.5</div>
+<h1>DAMS v3.1.5 Beta</h1>
+<div id="status">Syncing settings from cloud...</div>
+
+<select id="subject-select"><option>Loading...</option></select>
+<select id="officer-select"><option>Loading...</option></select>
+<input type="text" id="student-id" placeholder="Scan or Enter Student ID">
+<button onclick="recordAttendance()">Submit Attendance</button>
 
 <script>
-// --- CORE VARIABLE STATE ---
-let profiles = JSON.parse(localStorage.getItem('dams_profiles') || '[]');
-let subjects = JSON.parse(localStorage.getItem('dams_subjects') || '[]');
-let subjectMeta = JSON.parse(localStorage.getItem('dams_subject_meta') || '{}');
-let records = JSON.parse(localStorage.getItem('dams_records') || '[]');
-let finalized = JSON.parse(localStorage.getItem('dams_finalized') || '{}');
-let cloudUrl = localStorage.getItem('dams_sheets_url') || '';
+  // Your provided Web App URL
+  const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
 
-// --- NEW CLOUD SYNC LOGIC (Added) ---
-async function syncDropdownsFromCloud() {
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
+  async function initCloudApp() {
     try {
-        const response = await fetch(CLOUD_URL);
-        const data = await response.json();
-        const subSelects = ['subject-select', 'records-subject-select', 'analytics-subject-select', 'csv-subject-select', 'settings-subject-select'];
-        
-        let subOptions = data.slice(1).map(r => r[0]).filter(Boolean).map(s => `<option value="${s}">${s}</option>`).join('');
-        subSelects.forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerHTML = subOptions; });
-        
-        // Populate Officers (assuming Col B)
-        const officerSelect = document.getElementById('officer-select');
-        let offOptions = data.slice(1).map(r => r[1]).filter(Boolean).map(o => `<option value="${o}">${o}</option>`).join('');
-        if(officerSelect) officerSelect.innerHTML = `<option value="">Select Monitoring Officer</option>` + offOptions;
-        
-    } catch (e) {
-        console.log("Cloud sync skipped, using local storage");
+      const response = await fetch(CLOUD_URL);
+      const data = await response.json();
+      const subSelect = document.getElementById('subject-select');
+      const offSelect = document.getElementById('officer-select');
+      
+      subSelect.innerHTML = '<option value="">Select Subject</option>';
+      offSelect.innerHTML = '<option value="">Select Officer</option>';
+
+      data.forEach(row => {
+        if(row[0]) subSelect.innerHTML += `<option value="${row[0]}">${row[0]}</option>`;
+        if(row[1]) offSelect.innerHTML += `<option value="${row[1]}">${row[1]}</option>`;
+      });
+      document.getElementById('status').textContent = "Cloud Synchronized";
+    } catch (err) {
+      document.getElementById('status').textContent = "Connection Error.";
     }
-}
+  }
 
-// --- YOUR ORIGINAL FUNCTIONS (Paste everything you had before starting here) ---
-// (e.g., toggleTheme, initTheme, switchView, toast, verifyConnectivity, saveSubject, etc.)
+  async function recordAttendance() {
+    const payload = {
+      studentId: document.getElementById('student-id').value,
+      name: "Student", // You can expand this to lookup names
+      subject: document.getElementById('subject-select').value,
+      date: new Date().toLocaleDateString(),
+      time: new Date().toLocaleTimeString(),
+      officer: document.getElementById('officer-select').value,
+      status: "Present"
+    };
 
-// --- INITIALIZATION ---
-// Replace your old "rebuildDropdowns()" call with this new sync call:
-window.onload = () => {
-    initTheme();
-    syncDropdownsFromCloud(); // <--- This pulls from cloud
-    setupScannerHardware();
-    verifyConnectivity();
-    autoTrackSubjectSettings();
-};
+    fetch(CLOUD_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(() => {
+      alert("Attendance Recorded!");
+      document.getElementById('student-id').value = "";
+    });
+  }
 
+  window.onload = initCloudApp;
 </script>
 </body>
 </html>
