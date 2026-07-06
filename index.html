@@ -388,7 +388,10 @@ let subjects = JSON.parse(localStorage.getItem('dams_subjects') || '[]');
 let subjectMeta = JSON.parse(localStorage.getItem('dams_subject_meta') || '{}');
 let records = JSON.parse(localStorage.getItem('dams_records') || '[]');
 let finalized = JSON.parse(localStorage.getItem('dams_finalized') || '{}');
-let cloudUrl = localStorage.getItem('dams_sheets_url') || '';
+
+// Hardcoded your production-ready Google Web App URL link directly here
+let cloudUrl = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
+
 let chartPieInstance = null;
 let chartBarInstance = null;
 
@@ -533,6 +536,16 @@ function deleteProfile(idCard) {
   renderProfiles();
 }
 
+// Helper to save URLs explicitly typed into management box
+function saveSheetsUrl() {
+  const value = document.getElementById('sheets-url-input').value.trim();
+  if(value) {
+    cloudUrl = value;
+    localStorage.setItem('dams_sheets_url', value);
+    toast('Custom cloud pipeline registered.');
+  }
+}
+
 function renderProfiles(){
   document.getElementById('profile-count').textContent = profiles.length;
   const targetSelector = document.getElementById('officer-select');
@@ -620,6 +633,20 @@ function evaluateLatenessStatus(trackName) {
   return (new Date() > thresholdTime) ? 'Late' : 'Present';
 }
 
+// Polished background engine that auto-fires single scan captures to Google Sheets logs immediately
+function sendSingleScanToCloud(recordPayload) {
+  if(!cloudUrl) return;
+  
+  fetch(cloudUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recordPayload)
+  })
+  .then(() => console.log(`Dispatched log transmission event payload successfully for: ${recordPayload.studentId}`))
+  .catch(err => console.error("Pipeline connectivity buffer error: ", err));
+}
+
 function processScanPayload(scannedId) {
   const activeTrack = document.getElementById('subject-select').value;
   const staffVerifier = document.getElementById('officer-select').value;
@@ -651,7 +678,7 @@ function processScanPayload(scannedId) {
 
   const officerObj = profiles.find(p => p.id === staffVerifier);
 
-  records.push({
+  const newRecord = {
     rid: 'rec_' + Math.random().toString(36).substr(2, 9),
     studentId: scannedId,
     name: derivedName,
@@ -660,10 +687,14 @@ function processScanPayload(scannedId) {
     date: currentDateStamp,
     time: new Date().toLocaleTimeString('en-PH', {hour:'2-digit', minute:'2-digit'}),
     status: calculationAssessment
-  });
+  };
 
+  records.push(newRecord);
   persistState();
   toast(`Committed entry for ${derivedName}`);
+  
+  // Real-time Cloud Pipeline auto handshake call
+  sendSingleScanToCloud(newRecord);
 }
 
 function manualRecord(){
@@ -692,11 +723,9 @@ function renderRecords(){
   elementSubmitBtn.disabled = !targetSubject || !subsetRecords.length || isLocked || targetDate !== todayStr();
   elementSubmitBtn.textContent = isLocked ? 'Verified ✓' : 'Finalize Master';
 
-  // Compute stats metrics counts
   const totalPresentCount = subsetRecords.filter(r => r.status === 'Present').length;
   const totalLateCount = subsetRecords.filter(r => r.status === 'Late').length;
   
-  // Calculate relative roster absentees
   const specificTrackRoster = profiles.filter(p => p.role === 'Student' && p.subjects.includes(targetSubject));
   const genericUniverseRoster = specificTrackRoster.length ? specificTrackRoster : profiles.filter(p => p.role === 'Student');
   
@@ -771,14 +800,7 @@ function exportCSV(){
   URL.revokeObjectURL(urlLink);
 }
 
-// ---------- Cloud Pipeline Interface Automation Hooks ----------
-function saveSheetsUrl() {
-  const value = document.getElementById('sheets-url-input').value.trim();
-  localStorage.setItem('dams_sheets_url', value);
-  cloudUrl = value;
-  toast('Configured operational upstream cloud bridge terminal');
-}
-
+// Bulk Finalization Submission Hook
 function submitMasterlist(){
   const ts = document.getElementById('records-subject-select').value;
   const dt = document.getElementById('records-date').value || todayStr();
@@ -792,12 +814,12 @@ function submitMasterlist(){
   toast('Locked localized dataset.');
 
   if(cloudUrl) {
-    toast('Initializing cloud payload broadcast sequence...');
+    toast('Initializing full cloud broadcast archive sync...');
     fetch(cloudUrl, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: ts, date: dt, dataset: listData })
+      body: JSON.stringify({ subject: ts, date: dt, dataset: listData, bulkFinalize: true })
     })
     .then(() => toast('Cloud synchronization acknowledged securely.'))
     .catch(ex => { toast('Telemetry timeout error. Stored in local flash.'); console.error(ex); });
@@ -818,7 +840,6 @@ function renderAnalytics() {
   const distinctScanned = new Set(subset.map(r => r.studentId));
   const absentCount = Math.max(0, rosterBaseline.length - distinctScanned.size);
 
-  // Chart Rendering Implementation Logic
   if(chartPieInstance) chartPieInstance.destroy();
   const ctxPie = document.getElementById('chart-pie').getContext('2d');
   chartPieInstance = new Chart(ctxPie, {
@@ -834,7 +855,6 @@ function renderAnalytics() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
   });
 
-  // Subject Metrics distribution chart processing 
   const labelsSubjects = [];
   const allocationCounts = [];
   subjects.forEach(s => {
@@ -921,7 +941,6 @@ function setupScannerHardware(){
   });
 }
 
-// PWA Engine Invalidation Hook Interface Registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('data:text/javascript;base64,Ly8gU2VydmljZSBXb3JrZXIgTW9jayBCdWZmZXI=')
@@ -930,7 +949,9 @@ if ('serviceWorker' in navigator) {
 }
 
 document.getElementById('records-date').value = todayStr();
-if(cloudUrl) document.getElementById('sheets-url-input').value = cloudUrl;
+
+// Pre-fill the input box in settings with your default deployment link
+document.getElementById('sheets-url-input').value = cloudUrl;
 
 initTheme();
 rebuildDropdowns();
