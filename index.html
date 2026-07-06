@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>DAMS V3.5 Beta 1 — Digital Attendance Monitoring System</title>
+<title>DAMS V3.5 Beta 2 — Digital Attendance Monitoring System</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -189,7 +189,7 @@
     <div class="brand">
       <div class="brand-mark">D</div>
       <div class="brand-text">
-        <h1>DAMS V3 <span class="ver-tag">3.5 BETA 1</span></h1>
+        <h1>DAMS V3 <span class="ver-tag">3.5 BETA 2</span></h1>
         <p>Digital Attendance System</p>
       </div>
     </div>
@@ -313,6 +313,7 @@
     <div class="card">
       <input type="text" id="sheets-url-input" placeholder="Google Web App deployment URL">
       <button class="btn btn-primary btn-block" onclick="saveSheetsUrl()">Link Remote Cloud Pipeline</button>
+      <button class="btn btn-outline btn-block" style="margin-top:6px;" onclick="pullConfigFromCloud()">Pull Subjects & Roster from Cloud</button>
     </div>
 
     <div class="section-label">Roster Import (CSV Masterlist)</div>
@@ -454,6 +455,7 @@ function saveSubject(){
   rebuildDropdowns();
   document.getElementById('new-subject-name').value = '';
   toast(`Registered track: ${sName}`);
+  pushConfigToCloud();
 }
 
 function removeSubject() {
@@ -466,6 +468,7 @@ function removeSubject() {
     rebuildDropdowns();
     loadSubjectMeta();
     toast(`Purged subject dataset.`);
+    pushConfigToCloud();
   }
 }
 
@@ -487,6 +490,7 @@ function saveSubjectMeta() {
   persistState();
   autoTrackSubjectSettings();
   toast('Updated timetable metadata logic rules');
+  pushConfigToCloud();
 }
 
 function autoTrackSubjectSettings() {
@@ -528,12 +532,14 @@ function addProfile(){
   document.getElementById('new-id').value = '';
   renderProfiles();
   toast('Saved system profile card.');
+  pushConfigToCloud();
 }
 
 function deleteProfile(idCard) {
   profiles = profiles.filter(p => p.id !== idCard);
   persistState();
   renderProfiles();
+  pushConfigToCloud();
 }
 
 // Helper to save URLs explicitly typed into management box
@@ -543,6 +549,7 @@ function saveSheetsUrl() {
     cloudUrl = value;
     localStorage.setItem('dams_sheets_url', value);
     toast('Custom cloud pipeline registered.');
+    pushConfigToCloud();
   }
 }
 
@@ -617,6 +624,7 @@ function importCSV() {
     renderProfiles();
     toast(`Added: ${inserted} profiles, Linked: ${linked} entities`);
     inputElement.value = '';
+    pushConfigToCloud();
   };
   reader.readAsText(file);
 }
@@ -631,6 +639,33 @@ function evaluateLatenessStatus(trackName) {
   thresholdTime.setHours(targetHour, targetMin + (rule.gracePeriod || 0), 59, 999);
   
   return (new Date() > thresholdTime) ? 'Late' : 'Present';
+}
+
+// ---------- Cross-device Config Sync (subjects, schedule, roster) ----------
+function pushConfigToCloud(){
+  if(!cloudUrl) return;
+  fetch(cloudUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'config', subjects, subjectMeta, profiles })
+  }).catch(err => console.error('Config push failed:', err));
+}
+
+function pullConfigFromCloud(){
+  if(!cloudUrl) return;
+  fetch(cloudUrl)
+    .then(res => res.json())
+    .then(cfg => {
+      if(cfg.subjects) subjects = cfg.subjects;
+      if(cfg.subjectMeta) subjectMeta = cfg.subjectMeta;
+      if(cfg.profiles) profiles = cfg.profiles;
+      persistState();
+      rebuildDropdowns();
+      renderProfiles();
+      toast('Synced roster & subjects from cloud.');
+    })
+    .catch(err => console.error('Config pull failed:', err));
 }
 
 // Polished background engine that auto-fires single scan captures to Google Sheets logs immediately
@@ -957,6 +992,7 @@ initTheme();
 rebuildDropdowns();
 verifyConnectivity();
 autoTrackSubjectSettings();
+pullConfigFromCloud();
 
 window.addEventListener('load', setupScannerHardware);
 </script>
