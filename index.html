@@ -4,90 +4,59 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>DAMS V3.3.0 — Digital Attendance Monitoring System</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- [KEEP ALL YOUR ORIGINAL CSS STYLES HERE] -->
 <style>
-  /* [Keep all your existing CSS here, it remains unchanged] */
-  :root, [data-theme="light"] { --maroon: #7A0C2E; --maroon-dark: #560820; --gold: #F4B41A; --gold-soft: #FBE3A5; --bg: #FAF7F2; --card: #FFFFFF; --ink: #241014; --muted: #8A7A80; --line: #EAE0DE; --ok: #2E7D4F; --warn: #C77700; --danger: #B3261E; --radius: 14px; }
-  [data-theme="dark"] { --maroon: #A9264E; --maroon-dark: #20020A; --gold: #F5BC32; --gold-soft: #3D2D0A; --bg: #140D0F; --card: #1F1517; --ink: #F7EAEF; --muted: #A69096; --line: #332226; --ok: #42A96D; --warn: #EAA023; --danger: #E2534C; }
-  *{box-sizing:border-box; margin:0; padding:0; transition: background 0.2s, border-color 0.2s;}
-  body{ font-family: 'Segoe UI', Inter, sans-serif; background: var(--bg); color: var(--ink); max-width: 480px; margin: 0 auto; min-height: 100vh; display:flex; flex-direction:column; position:relative; }
-  header{ background: var(--maroon-dark); color: white; padding: 18px 20px 22px; border-bottom: 2px solid var(--gold); }
-  .brand-row{ display:flex; justify-content:space-between; align-items:center; }
-  .brand{ display:flex; align-items:center; gap:10px; }
-  .brand-mark{ width:38px; height:38px; border:2.5px solid var(--gold); border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:700; color: var(--gold); }
-  .brand-text h1{ font-size: 18px; font-weight:700; }
-  .status-strip{ margin-top:14px; display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.06); border-radius: 10px; padding: 9px 12px; font-size:12px; }
-  main{ flex:1; padding: 18px 16px 90px; }
-  .view{ display:none; }
-  .view.active{ display:block; }
-  select, input, button { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); font-size:14px; margin-bottom:10px; }
-  .btn{ background: var(--maroon); color:white; border:none; padding:11px; cursor:pointer; }
-  .scan-frame{ position:relative; aspect-ratio: 1/1; background:#111; border-radius: 14px; overflow:hidden; }
-  #qr-reader{ width:100%; height:100%; }
+/* ... (Paste your original CSS from the source you provided earlier here) ... */
 </style>
 </head>
 <body>
 
-<header>
-  <div class="brand-row">
-    <div class="brand"><div class="brand-mark">D</div><div class="brand-text"><h1>DAMS V3 <span class="ver-tag">3.3.0</span></h1></div></div>
-  </div>
-  <div class="status-strip"><span id="conn-text">Syncing...</span></div>
-</header>
-
-<main>
-  <div class="view active" id="view-scan">
-    <select id="subject-select" onchange="autoTrackSubjectSettings()"><option>Loading Subjects...</option></select>
-    <select id="officer-select"><option>Loading Officers...</option></select>
-    <div class="scan-frame"><div id="qr-reader"></div></div>
-    <input type="text" id="manual-input" placeholder="Type PUP ID manually">
-    <button class="btn" onclick="manualRecord()">Submit Attendance</button>
-  </div>
-  <!-- [Keep your other views exactly as they were in your original code] -->
-</main>
+<!-- [KEEP ALL YOUR ORIGINAL HTML STRUCTURE HERE - FROM THE FILE YOU PROVIDED] -->
+<!-- (Make sure to include your header, nav, and all views) -->
 
 <script>
-// ---------- Configuration ----------
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
+// --- CORE VARIABLE STATE ---
+let profiles = JSON.parse(localStorage.getItem('dams_profiles') || '[]');
+let subjects = JSON.parse(localStorage.getItem('dams_subjects') || '[]');
+let subjectMeta = JSON.parse(localStorage.getItem('dams_subject_meta') || '{}');
+let records = JSON.parse(localStorage.getItem('dams_records') || '[]');
+let finalized = JSON.parse(localStorage.getItem('dams_finalized') || '{}');
+let cloudUrl = localStorage.getItem('dams_sheets_url') || '';
 
-// ---------- Cloud Sync Logic ----------
-async function syncFromCloud() {
-    const connText = document.getElementById('conn-text');
+// --- NEW CLOUD SYNC LOGIC (Added) ---
+async function syncDropdownsFromCloud() {
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
     try {
         const response = await fetch(CLOUD_URL);
         const data = await response.json();
+        const subSelects = ['subject-select', 'records-subject-select', 'analytics-subject-select', 'csv-subject-select', 'settings-subject-select'];
         
-        // Populate Dropdowns from Google Sheets (Row 0 is header)
-        const subSelect = document.getElementById('subject-select');
-        const offSelect = document.getElementById('officer-select');
+        let subOptions = data.slice(1).map(r => r[0]).filter(Boolean).map(s => `<option value="${s}">${s}</option>`).join('');
+        subSelects.forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerHTML = subOptions; });
         
-        subSelect.innerHTML = '<option value="">Select Subject</option>';
-        offSelect.innerHTML = '<option value="">Select Officer</option>';
+        // Populate Officers (assuming Col B)
+        const officerSelect = document.getElementById('officer-select');
+        let offOptions = data.slice(1).map(r => r[1]).filter(Boolean).map(o => `<option value="${o}">${o}</option>`).join('');
+        if(officerSelect) officerSelect.innerHTML = `<option value="">Select Monitoring Officer</option>` + offOptions;
         
-        data.slice(1).forEach(row => {
-            if(row[0]) subSelect.innerHTML += `<option value="${row[0]}">${row[0]}</option>`;
-            if(row[1]) offSelect.innerHTML += `<option value="${row[1]}">${row[1]}</option>`;
-        });
-        
-        connText.textContent = "Cloud Synchronized";
-    } catch (err) {
-        connText.textContent = "Offline Mode";
-        console.error("Cloud fetch failed", err);
+    } catch (e) {
+        console.log("Cloud sync skipped, using local storage");
     }
 }
 
-// ---------- Rest of your Original JS ----------
-// [Insert all your original functions (processScanPayload, renderRecords, etc.) below this line]
+// --- YOUR ORIGINAL FUNCTIONS (Paste everything you had before starting here) ---
+// (e.g., toggleTheme, initTheme, switchView, toast, verifyConnectivity, saveSubject, etc.)
 
-// Modify the Initialization Sequence:
+// --- INITIALIZATION ---
+// Replace your old "rebuildDropdowns()" call with this new sync call:
 window.onload = () => {
-    syncFromCloud(); // Fetch fresh lists from Cloud
-    setupScannerHardware(); // Original scanner setup
     initTheme();
-    // ... any other original init functions
+    syncDropdownsFromCloud(); // <--- This pulls from cloud
+    setupScannerHardware();
+    verifyConnectivity();
+    autoTrackSubjectSettings();
 };
+
 </script>
 </body>
 </html>
