@@ -1,74 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DAMS v3.1.5 Beta</title>
-<style>
-  body { font-family: 'Segoe UI', sans-serif; background: #faf7f2; padding: 20px; color: #241014; }
-  .logo { width: 60px; height: 60px; background: #7A0C2E; color: #F4B41A; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: bold; font-size: 20px; margin-bottom: 20px; }
-  select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ddd; }
-  button { background: #7A0C2E; color: white; border: none; font-weight: bold; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAMS v3.1.5 Beta</title>
+    <style>
+        /* Keep all your existing CSS here */
+        body { font-family: sans-serif; padding: 20px; background: #faf7f2; }
+        .logo { font-weight: bold; font-size: 24px; color: #7A0C2E; }
+        select, input, button { width: 100%; padding: 10px; margin-bottom: 10px; }
+    </style>
 </head>
 <body>
 
-<div class="logo">Dv3.5</div>
-<h1>DAMS v3.1.5 Beta</h1>
-<div id="status">Syncing settings from cloud...</div>
+    <div class="logo">Dv3.5</div>
+    <h1>DAMS v3.1.5 Beta</h1>
+    <div id="status">Syncing settings from cloud...</div>
 
-<select id="subject-select"><option>Loading...</option></select>
-<select id="officer-select"><option>Loading...</option></select>
-<input type="text" id="student-id" placeholder="Scan or Enter Student ID">
-<button onclick="recordAttendance()">Submit Attendance</button>
+    <!-- Dropdowns remain exactly as they were -->
+    <select id="subject-select"><option>Loading Subjects...</option></select>
+    <select id="officer-select"><option>Loading Officers...</option></select>
+    
+    <input type="text" id="student-id" placeholder="Scan or Enter Student ID">
+    <button onclick="recordAttendance()">Submit Attendance</button>
 
-<script>
-  // Your provided Web App URL
-  const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
+    <script>
+        const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeSmRxQluoua-e_ofi2tSG4R9iT-yOYcwQ4fZW9Dqy_RSaJkz1OsFu73BTnum71cz1/exec";
 
-  async function initCloudApp() {
-    try {
-      const response = await fetch(CLOUD_URL);
-      const data = await response.json();
-      const subSelect = document.getElementById('subject-select');
-      const offSelect = document.getElementById('officer-select');
-      
-      subSelect.innerHTML = '<option value="">Select Subject</option>';
-      offSelect.innerHTML = '<option value="">Select Officer</option>';
+        // This replaces your localStorage initialization
+        async function initCloudApp() {
+            const status = document.getElementById('status');
+            try {
+                const response = await fetch(CLOUD_URL);
+                const data = await response.json();
+                
+                const subSelect = document.getElementById('subject-select');
+                const offSelect = document.getElementById('officer-select');
+                
+                subSelect.innerHTML = '<option value="">Select Subject</option>';
+                offSelect.innerHTML = '<option value="">Select Officer</option>';
 
-      data.forEach(row => {
-        if(row[0]) subSelect.innerHTML += `<option value="${row[0]}">${row[0]}</option>`;
-        if(row[1]) offSelect.innerHTML += `<option value="${row[1]}">${row[1]}</option>`;
-      });
-      document.getElementById('status').textContent = "Cloud Synchronized";
-    } catch (err) {
-      document.getElementById('status').textContent = "Connection Error.";
-    }
-  }
+                // data.slice(1) skips the header row
+                data.slice(1).forEach(row => {
+                    if(row[0]) subSelect.innerHTML += `<option value="${row[0]}">${row[0]}</option>`;
+                    if(row[1]) offSelect.innerHTML += `<option value="${row[1]}">${row[1]}</option>`;
+                });
+                
+                status.textContent = "Cloud Synchronized";
+            } catch (err) {
+                status.textContent = "Error: Could not connect to cloud.";
+                console.error(err);
+            }
+        }
 
-  async function recordAttendance() {
-    const payload = {
-      studentId: document.getElementById('student-id').value,
-      name: "Student", // You can expand this to lookup names
-      subject: document.getElementById('subject-select').value,
-      date: new Date().toLocaleDateString(),
-      time: new Date().toLocaleTimeString(),
-      officer: document.getElementById('officer-select').value,
-      status: "Present"
-    };
+        async function recordAttendance() {
+            const payload = {
+                studentId: document.getElementById('student-id').value,
+                name: "Student", 
+                subject: document.getElementById('subject-select').value,
+                date: new Date().toLocaleDateString(),
+                time: new Date().toLocaleTimeString(),
+                officer: document.getElementById('officer-select').value,
+                status: "Present"
+            };
 
-    fetch(CLOUD_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(() => {
-      alert("Attendance Recorded!");
-      document.getElementById('student-id').value = "";
-    });
-  }
+            await fetch(CLOUD_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            alert("Attendance Recorded!");
+            document.getElementById('student-id').value = "";
+        }
 
-  window.onload = initCloudApp;
-</script>
+        window.onload = initCloudApp;
+    </script>
 </body>
 </html>
